@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="ViPO introduces Poly-DPO and large-scale visual preference datasets to scale preference optimization for image and video generation.">
+  <meta name="keywords" content="Visual Preference Optimization, Diffusion Models, Text-to-Image, Text-to-Video, Poly-DPO, ViPO">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ViPO: Visual Preference Optimization at Scale</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+
+  <style>
+    :root {
+      --accent: #2563eb;
+      --accent-2: #10b981;
+      --accent-soft: rgba(37, 99, 235, 0.10);
+    }
+  </style>
+
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script defer src="./static/js/index.js"></script>
+</head>
+<body>
+
+<section class="hero publication-hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop has-text-centered">
+      <h1 class="title is-1 publication-title">ViPO: Visual Preference Optimization at Scale</h1>
+      <div class="is-size-5 publication-authors">
+        <span class="author-block"><a href="https://liming-ai.github.io/">Ming Li</a><sup>1,2,‡</sup>,</span>
+        <span class="author-block"><a href="https://wujie1010.github.io/">Jie Wu</a><sup>2</sup>,</span>
+        <span class="author-block"><a href="https://scholar.google.com/citations?user=zel3jUcAAAAJ&hl=en">Justin Cui</a><sup>2,3</sup>,</span>
+        <span class="author-block"><a href="https://scholar.google.com/citations?user=RghSlb0AAAAJ">Xiaojie Li</a><sup>2</sup>,</span>
+        <span class="author-block"><a href="https://scholar.google.com/citations?user=nGki_EEAAAAJ">Rui Wang</a><sup>2</sup>,</span>
+        <span class="author-block"><a href="https://www.crcv.ucf.edu/chenchen/">Chen Chen</a><sup>1</sup></span>
+      </div>
+      <div class="publication-authors is-size-6">
+        <span class="author-block"><sup>1</sup>University of Central Florida</span>
+        <span class="author-block"><sup>2</sup>ByteDance Seed</span>
+        <span class="author-block"><sup>3</sup>UCLA</span>
+      </div>
+      <div class="publication-conference">ICLR 2026</div>
+      <div class="publication-note">‡ The first author’s contribution was completed during an internship, as noted in the manuscript source.</div>
+      <p class="publication-subtitle">
+        Poly-DPO makes preference optimization confidence-aware, while ViPO-Image-1M and ViPO-Video-300K provide the scale and quality needed to push visual alignment far beyond noisy legacy preference sets.
+      </p>
+      <div class="publication-links">
+        <span class="link-block">
+          <a href="#method" class="button is-normal is-rounded is-dark">
+            <span class="icon"><i class="fas fa-project-diagram"></i></span>
+            <span>Method</span>
+          </a>
+        </span>
+        <span class="link-block">
+          <a href="#results" class="button is-normal is-rounded is-dark">
+            <span class="icon"><i class="fas fa-chart-line"></i></span>
+            <span>Results</span>
+          </a>
+        </span>
+        <span class="link-block">
+          <a href="#bibtex" class="button is-normal is-rounded is-light">
+            <span class="icon"><i class="fas fa-quote-right"></i></span>
+            <span>BibTeX</span>
+          </a>
+        </span>
+        <span class="link-block">
+          <span class="status-chip">
+            <i class="fas fa-hourglass-half"></i>
+            Code (Under Review)
+          </span>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section teaser">
+  <div class="container is-max-desktop">
+    <div class="section-shell figure-card">
+      <div class="figure-frame">
+        <img src="./static/images/teaser.png" alt="ViPO teaser figure showing scaling with Poly-DPO and ViPO datasets.">
+      </div>
+      <div class="figure-caption has-text-centered">
+        <strong>Scaling visual preference optimization requires both better optimization and better data.</strong>
+        The teaser from the paper highlights three complementary stories: Poly-DPO improves noisy existing datasets such as Pick-a-Pic V2, ViPO-Image-1M unlocks stronger scaling on modern image models, and the joint recipe continues to improve as preference data grows.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-anchor" id="abstract">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">Abstract</h2>
+      <p class="section-description">
+        The paper argues that current visual preference optimization fails to scale because the field has been constrained by two bottlenecks: noisy and biased preference distributions in existing open datasets, and a lack of high-quality large-scale datasets for modern image and video generators.
+      </p>
+      <div class="content has-text-justified">
+        <p>
+          While preference optimization is crucial for improving visual generative models, how to effectively scale this paradigm for visual generation remains largely unexplored. Current open-source preference datasets typically contain substantial conflicting preference patterns, where winners excel in some dimensions but underperform in others. Naively optimizing on such noisy datasets fails to learn meaningful preferences, fundamentally hindering effective scaling.
+        </p>
+        <p>
+          To enhance robustness against these noisy signals, the paper proposes <strong>Poly-DPO</strong>, which extends the DPO objective with an additional polynomial term that dynamically adjusts model confidence during training. To remove the data bottleneck, it builds <strong>ViPO</strong>, a large-scale preference dataset with <strong>1M image pairs</strong> at 1024px across five categories and <strong>300K video pairs</strong> at 720p+ across three categories.
+        </p>
+        <p>
+          A key observation in the manuscript is especially important: once the training data is sufficiently balanced and reliable, the best Poly-DPO configuration naturally converges back toward standard DPO. In other words, adaptive optimization matters most on imperfect datasets, while high-quality data makes the objective itself simpler and more stable.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="summary-grid">
+      <div class="card-surface">
+        <h3>Poly-DPO</h3>
+        <p>A one-parameter extension of Diffusion-DPO that reweights learning by confidence, handling noisy, trivial, and balanced preference distributions with the same objective.</p>
+      </div>
+      <div class="card-surface">
+        <h3>ViPO-Image-1M</h3>
+        <p>1 million 1024px image preference pairs spanning aesthetics, composition, alignment, text rendering, and portrait quality.</p>
+      </div>
+      <div class="card-surface">
+        <h3>ViPO-Video-300K</h3>
+        <p>300 thousand 720p+ video preference pairs covering motion quality, visual quality, and video-text alignment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-anchor" id="method">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">Method</h2>
+      <p class="section-description">
+        ViPO is not only a dataset paper. It also reframes Diffusion-DPO as a binary classification objective and adds a single polynomial term that changes how aggressively the model learns from confident versus uncertain comparisons.
+      </p>
+
+      <div class="equation-box">
+        \[
+          L_{\mathrm{Poly\text{-}DPO}} = -\log(p^{w > l}) + \alpha \left(1 - p^{w > l}\right)
+        \]
+        <p>
+          The added term makes the loss confidence-aware. Positive \(\alpha\) helps noisy datasets with conflicting preference patterns, negative \(\alpha\) regularizes trivially easy preference pairs, and high-quality balanced data naturally pushes the best setting back toward \(\alpha \approx 0\).
+        </p>
+      </div>
+
+      <div class="figure-card" style="margin-bottom: 1rem;">
+        <div class="figure-frame">
+          <img src="./static/images/poly_dpo.png" alt="Poly-DPO summary figure.">
+        </div>
+        <div class="figure-caption">
+          <strong>Poly-DPO in one figure.</strong>
+          The manuscript’s summary figure shows the three regimes Poly-DPO is meant to cover: conflict-heavy noisy data, oversimplified preference data, and high-quality balanced preference data.
+        </div>
+      </div>
+
+      <div class="three-up-grid">
+        <div class="card-surface">
+          <h3>\(\alpha &gt; 0\): noisy data</h3>
+          <p>Upweights informative uncertain examples when preference pairs contain multi-dimensional conflicts, such as Pick-a-Pic V2.</p>
+        </div>
+        <div class="card-surface">
+          <h3>\(\alpha &lt; 0\): trivial data</h3>
+          <p>Prevents overconfidence when winner/loser differences are too easy and the model would otherwise overfit to superficial patterns.</p>
+        </div>
+        <div class="card-surface">
+          <h3>\(\alpha \approx 0\): clean data</h3>
+          <p>On ViPO-Image-1M, the best setting converges toward standard DPO, validating the underlying data quality.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        A striking statistic from the paper’s ablation: only <strong>20.79%</strong> of Pick-a-Pic V2 pairs receive consistent winner/loser rankings across five reward models. That observation motivates both the algorithmic design of Poly-DPO and the new ViPO dataset.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">Dataset</h2>
+      <p class="section-description">
+        The dataset construction emphasizes coverage, resolution, and reliable preference signals. Instead of relying on random collections built from early diffusion models, ViPO organizes preferences into explicit quality categories and uses strong modern generators and raters.
+      </p>
+
+      <div class="figure-card" style="margin-bottom: 1rem;">
+        <div class="figure-frame">
+          <img src="./static/images/dataset_overview.png" alt="ViPO dataset overview.">
+        </div>
+        <div class="figure-caption">
+          <strong>ViPO overview.</strong>
+          The paper organizes ViPO into image and video branches, then further divides each branch into carefully designed quality dimensions so the training signal covers more than a single undifferentiated “overall quality” label.
+        </div>
+      </div>
+
+      <div class="metric-grid" style="margin-bottom: 1rem;">
+        <div class="metric-card">
+          <div class="metric-value">1M</div>
+          <div class="metric-label">image preference pairs</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">300K</div>
+          <div class="metric-label">video preference pairs</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">1024px</div>
+          <div class="metric-label">image resolution</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">720p+</div>
+          <div class="metric-label">video resolution</div>
+        </div>
+      </div>
+
+      <div class="two-up-grid">
+        <div class="card-surface">
+          <h3>Image categories</h3>
+          <div class="pill-list">
+            <span class="info-pill">Aesthetics</span>
+            <span class="info-pill">Composition</span>
+            <span class="info-pill">Text-Image Alignment</span>
+            <span class="info-pill">Text Rendering</span>
+            <span class="info-pill">Portrait Quality</span>
+          </div>
+        </div>
+        <div class="card-surface">
+          <h3>Video categories</h3>
+          <div class="pill-list">
+            <span class="info-pill">Motion Quality</span>
+            <span class="info-pill">Visual Quality</span>
+            <span class="info-pill">Video-Text Alignment</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-up-grid" style="margin-top: 1rem;">
+        <div class="figure-card">
+          <div class="figure-frame">
+            <img src="./static/images/image_dataset.png" alt="ViPO image dataset visualization." loading="lazy">
+          </div>
+          <div class="figure-caption">Examples from <strong>ViPO-Image-1M</strong>, showing the paper’s five-category organization of image preferences.</div>
+        </div>
+        <div class="figure-card">
+          <div class="figure-frame">
+            <img src="./static/images/video_dataset.png" alt="ViPO video dataset visualization." loading="lazy">
+          </div>
+          <div class="figure-caption">Examples from <strong>ViPO-Video-300K</strong>, covering motion quality, visual quality, and text-video alignment.</div>
+        </div>
+      </div>
+
+      <div class="details-shell" style="margin-top: 1rem;">
+        <summary>Open-source release note from the manuscript</summary>
+        <div class="details-content content has-text-justified">
+          <p>
+            The source explicitly notes that the original internal version includes proprietary model outputs that may not be releasable as-is. To support reproducibility, the paper describes an alternative open version that substitutes those outputs with publicly available generators while preserving strong downstream performance.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-anchor" id="results">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">Results</h2>
+      <p class="section-description">
+        The paper evaluates both the algorithmic contribution (Poly-DPO on noisy existing data) and the data contribution (training with ViPO-Image-1M and ViPO-Video-300K on multiple modern generator families).
+      </p>
+
+      <h3 class="title is-4">Poly-DPO on Pick-a-Pic V2</h3>
+      <div class="table-scroll">
+        <table class="research-table">
+          <thead>
+            <tr>
+              <th>Setting</th>
+              <th>Method</th>
+              <th>PickScore ↑</th>
+              <th>HPSv2.1 ↑</th>
+              <th>ImageReward ↑</th>
+              <th>GenEval overall ↑</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SD1.5 / Pick-a-Pic V2 test</td>
+              <td>Base SD1.5</td>
+              <td>20.57</td>
+              <td>25.02</td>
+              <td>0.085</td>
+              <td>42.34</td>
+            </tr>
+            <tr>
+              <td>SD1.5 / Pick-a-Pic V2 test</td>
+              <td>Diffusion-DPO</td>
+              <td>20.95</td>
+              <td>26.12</td>
+              <td>0.297</td>
+              <td>43.00</td>
+            </tr>
+            <tr>
+              <td>SD1.5 / Pick-a-Pic V2 test</td>
+              <td>Diffusion-KTO</td>
+              <td>21.06</td>
+              <td>28.06</td>
+              <td>0.628</td>
+              <td>43.65</td>
+            </tr>
+            <tr class="highlight-row">
+              <td>SD1.5 / Pick-a-Pic V2 test</td>
+              <td><strong>Poly-DPO (ours)</strong></td>
+              <td><strong>21.48</strong></td>
+              <td><strong>28.30</strong></td>
+              <td><strong>0.679</strong></td>
+              <td><strong>49.87</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">On SD1.5, Poly-DPO improves both scalar preference rewards and harder compositional generalization, especially on challenging GenEval sub-tasks like counting and attribute binding.</p>
+
+      <h3 class="title is-4" style="margin-top: 1.75rem;">Training on ViPO-Image-1M</h3>
+      <div class="table-scroll">
+        <table class="research-table">
+          <thead>
+            <tr>
+              <th>Model family</th>
+              <th>GenEval overall ↑</th>
+              <th>DPG-Bench overall ↑</th>
+              <th>CVTG-2K word acc ↑</th>
+              <th>Human quality ↑</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SD1.5 → +SFT &amp; Poly-DPO</td>
+              <td>0.42 → <strong>0.54</strong></td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td>SDXL → +SFT &amp; Poly-DPO</td>
+              <td>0.56 → <strong>0.63</strong></td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+            <tr class="highlight-row">
+              <td>SD3.5-Medium → +SFT &amp; Poly-DPO</td>
+              <td>0.69 → <strong>0.83</strong></td>
+              <td>84.24 → <strong>87.71</strong></td>
+              <td>0.4378 → <strong>0.6995</strong></td>
+              <td>73.25 → <strong>85.25</strong></td>
+            </tr>
+            <tr class="highlight-row">
+              <td>FLUX.1-dev → +SFT &amp; Poly-DPO</td>
+              <td>0.69 → <strong>0.79</strong></td>
+              <td>83.84 → <strong>87.31</strong></td>
+              <td>0.4878 → <strong>0.6859</strong></td>
+              <td>80.00 → <strong>88.75</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">The high-resolution ViPO dataset lifts multiple model families at once and improves not just composition, but also alignment, text rendering, and human anatomy quality.</p>
+
+      <h3 class="title is-4" style="margin-top: 1.75rem;">Training on ViPO-Video-300K</h3>
+      <div class="table-scroll">
+        <table class="research-table">
+          <thead>
+            <tr>
+              <th>Wan2.1-T2V-1.3B</th>
+              <th>Human Identity ↑</th>
+              <th>Dynamic Spatial Rel. ↑</th>
+              <th>Motion Order Und. ↑</th>
+              <th>Human Interaction ↑</th>
+              <th>Motion Rationality ↑</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Base</td>
+              <td>62.18</td>
+              <td>24.64</td>
+              <td>35.35</td>
+              <td>74.00</td>
+              <td>43.68</td>
+            </tr>
+            <tr class="highlight-row">
+              <td><strong>+ Poly-DPO on ViPO-Video-300K</strong></td>
+              <td><strong>67.99</strong></td>
+              <td><strong>33.82</strong></td>
+              <td><strong>38.62</strong></td>
+              <td><strong>78.00</strong></td>
+              <td><strong>47.70</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">The paper reports especially strong motion-related gains, including a <strong>37.4%</strong> improvement on Dynamic Spatial Relationship.</p>
+
+      <div class="figure-card" style="margin-top: 1.75rem;">
+        <div class="figure-frame">
+          <img src="./static/images/ablation_alpha.png" alt="ViPO ablation on alpha." loading="lazy">
+        </div>
+        <div class="figure-caption">
+          <strong>Ablation over \(\alpha\).</strong>
+          The trend in the paper is clear: noisy datasets prefer positive \(\alpha\), overly simple datasets prefer negative \(\alpha\), and the complete ViPO data distribution stabilizes near standard DPO.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">Human Study</h2>
+      <p class="section-description">
+        The authors validate both the reliability of the human annotations and the quality of their VLM-based rater.
+      </p>
+
+      <div class="metric-grid" style="margin-bottom: 1rem;">
+        <div class="metric-card">
+          <div class="metric-value">4,378</div>
+          <div class="metric-label">human preference annotations</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">18</div>
+          <div class="metric-label">annotators</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">87.2%</div>
+          <div class="metric-label">mean rater accuracy</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">81.2%</div>
+          <div class="metric-label">VLM agreement with consensus</div>
+        </div>
+      </div>
+
+      <div class="figure-card">
+        <div class="figure-frame">
+          <img src="./static/images/human_eval.png" alt="Human evaluation comparison between VLM and human raters." loading="lazy">
+        </div>
+        <div class="figure-caption">
+          <strong>VLM vs. human raters.</strong>
+          According to the paper, the VLM aligns more strongly than the average individual human on image tasks, but still lags human raters on fine-grained temporal motion quality for videos.
+        </div>
+      </div>
+
+      <div class="details-shell" style="margin-top: 1rem;">
+        <summary>Supplementary annotation figures</summary>
+        <div class="details-content">
+          <div class="two-up-grid">
+            <div class="figure-card">
+              <div class="figure-frame">
+                <img src="./static/images/human_reliability.png" alt="Distribution of rater accuracy." loading="lazy">
+              </div>
+              <div class="figure-caption">Distribution of per-rater agreement with the human majority vote.</div>
+            </div>
+            <div class="figure-card">
+              <div class="figure-frame">
+                <img src="./static/images/human_eval_ui.png" alt="Human evaluation interface." loading="lazy">
+              </div>
+              <div class="figure-caption">The evaluation UI included in the supplementary material.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-anchor" id="bibtex">
+  <div class="container is-max-desktop">
+    <div class="section-shell">
+      <h2 class="section-title">BibTeX</h2>
+      <pre class="bibtex-block"><code>@inproceedings{li2026vipo,
+  title     = {ViPO: Visual Preference Optimization at Scale},
+  author    = {Li, Ming and Wu, Jie and Cui, Justin and Li, Xiaojie and Wang, Rui and Chen, Chen},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2026}
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            The template is borrowed from the <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
